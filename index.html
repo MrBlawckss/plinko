@@ -467,7 +467,12 @@ let addCashTimer = null;
 /* ================================================================================
    AUDIO SETUP & COLLISIONS (.wav configured)
    ================================================================================ */
-const bounceSound = new Audio('Sounds/bounce.wav');
+// Bump this number any time you replace the bounce.wav file with a new
+// version — browsers and GitHub's CDN cache audio files aggressively by
+// filename, so just re-uploading a file with the same name isn't enough to
+// make people actually hear the new one. Changing this forces a fresh fetch.
+const SOUND_VERSION = 4;
+const bounceSound = new Audio(`Sounds/bounce.wav?v=${SOUND_VERSION}`);
 bounceSound.preload = 'auto';
 
 Matter.Events.on(engine, 'collisionStart', (event) => {
