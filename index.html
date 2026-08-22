@@ -464,6 +464,38 @@ let floaters = [];
 let BOARD_GAP = 0;
 let addCashTimer = null;
 
+/* ================================================================================
+   AUDIO SETUP & COLLISIONS (.wav configured)
+   ================================================================================ */
+const bounceSound = new Audio('Sounds/bounce.wav');
+bounceSound.preload = 'auto';
+
+Matter.Events.on(engine, 'collisionStart', (event) => {
+  let playSound = false;
+
+  for (let pair of event.pairs) {
+    const labelA = pair.bodyA.label;
+    const labelB = pair.bodyB.label;
+
+    if (
+      (labelA === 'ball' && (labelB === 'peg' || labelB === 'ball')) ||
+      (labelB === 'ball' && (labelA === 'peg' || labelA === 'ball'))
+    ) {
+      playSound = true;
+      break;
+    }
+  }
+
+  if (playSound) {
+    const soundClone = bounceSound.cloneNode();
+    soundClone.volume = 0.3;
+    soundClone.currentTime = 0;
+    soundClone.play().catch((err) => {
+      console.log("Audio play prevented or file not found:", err);
+    });
+  }
+});
+
 function getUpgrade(id){ return CONFIG.UPGRADES.find(u => u.id === id); }
 function getLevel(id){ return state.upgradeLevels[id] || 0; }
 
