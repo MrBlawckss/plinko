@@ -467,7 +467,7 @@ let addCashTimer = null;
 /* ================================================================================
    AUDIO SETUP & COLLISIONS (.wav configured)
    ================================================================================ */
-const bounceSound = new Audio('Sounds/bounce.wav');
+const bounceSound = new Audio('Sounds/bounce');
 bounceSound.preload = 'auto';
 
 Matter.Events.on(engine, 'collisionStart', (event) => {
