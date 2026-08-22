@@ -467,7 +467,7 @@ let addCashTimer = null;
 /* ================================================================================
    AUDIO SETUP & COLLISIONS (.wav configured)
    ================================================================================ */
-const bounceSound = new Audio('Sounds/bounce');
+const bounceSound = new Audio('Sounds/bounce.wav');
 bounceSound.preload = 'auto';
 
 Matter.Events.on(engine, 'collisionStart', (event) => {
@@ -491,7 +491,7 @@ Matter.Events.on(engine, 'collisionStart', (event) => {
     soundClone.volume = 0.3;
     soundClone.currentTime = 0;
     soundClone.play().catch((err) => {
-      console.log("Audio play prevented or file not found:", err);
+      console.warn("Bounce sound failed to play — check that Sounds/bounce.wav exists, the filename/case matches exactly, and it loaded without a 404:", err);
     });
   }
 });
