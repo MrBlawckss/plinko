@@ -472,7 +472,7 @@ let addCashTimer = null;
 // filename, so just re-uploading a file with the same name isn't enough to
 // make people actually hear the new one. Changing this forces a fresh fetch.
 const SOUND_VERSION = 4;
-const bounceSound = new Audio(`Sounds/bounce.wav?v=${SOUND_VERSION}`);
+const bounceSound = new Audio(`Sounds/bouncehit.wav?v=${SOUND_VERSION}`);
 bounceSound.preload = 'auto';
 
 Matter.Events.on(engine, 'collisionStart', (event) => {
