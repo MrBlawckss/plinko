@@ -508,14 +508,66 @@ let addCashTimer = null;
 
 /* ================================================================================
    AUDIO SETUP & COLLISIONS (.wav configured)
+   ================================================================================
+   Uses the Web Audio API instead of <audio> elements. Cloning an <audio>
+   element (the old approach) spins up a brand-new decoder per play, and
+   browsers cap how many can run at once — with Multi-Ball + Rapid Drop
+   firing dozens of peg hits per second, that cap gets hit fast and the
+   browser just stops playing anything. Web Audio decodes the sound ONCE
+   into memory and can then play it many times simultaneously for almost
+   no extra cost, which is what a fast bounce sound actually needs.
    ================================================================================ */
+
 // Bump this number any time you replace the bounce.wav file with a new
 // version — browsers and GitHub's CDN cache audio files aggressively by
 // filename, so just re-uploading a file with the same name isn't enough to
 // make people actually hear the new one. Changing this forces a fresh fetch.
 const SOUND_VERSION = 4;
-const bounceSound = new Audio(`Sounds/bounce.wav?v=${SOUND_VERSION}`);
-bounceSound.preload = 'auto';
+const BOUNCE_SOUND_VOLUME = 0.3;
+
+// Hard cap on how many bounce sounds can play at the exact same instant.
+// Without this, a huge multi-ball pile-up could still spam so many voices
+// at once that it turns into a wall of noise / crackling. Raise or lower
+// to taste — this is NOT the same limit that was silencing the sound
+// before (that was a browser limit on <audio> elements specifically).
+const MAX_CONCURRENT_BOUNCE_SOUNDS = 12;
+
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+const audioCtx = AudioContextClass ? new AudioContextClass() : null;
+let bounceBuffer = null;
+let activeBounceVoices = 0;
+
+if(audioCtx){
+  fetch(`Sounds/bounce.wav?v=${SOUND_VERSION}`)
+    .then(res => {
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.arrayBuffer();
+    })
+    .then(data => audioCtx.decodeAudioData(data))
+    .then(buffer => { bounceBuffer = buffer; })
+    .catch(err => {
+      console.warn("Bounce sound failed to load — check that Sounds/bounce.wav exists, the filename/case matches exactly, and it loaded without a 404:", err);
+    });
+}
+
+function playBounceSound(){
+  if(!audioCtx || !bounceBuffer) return;
+  if(activeBounceVoices >= MAX_CONCURRENT_BOUNCE_SOUNDS) return; // throttle under heavy load
+
+  // Most browsers start an AudioContext "suspended" until a user gesture —
+  // dropping a ball counts as one, so resume here just in case.
+  if(audioCtx.state === "suspended") audioCtx.resume();
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = bounceBuffer;
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = BOUNCE_SOUND_VOLUME;
+  source.connect(gainNode).connect(audioCtx.destination);
+
+  activeBounceVoices++;
+  source.onended = () => { activeBounceVoices--; };
+  source.start(0);
+}
 
 Matter.Events.on(engine, 'collisionStart', (event) => {
   let playSound = false;
@@ -534,14 +586,10 @@ Matter.Events.on(engine, 'collisionStart', (event) => {
   }
 
   if (playSound) {
-    const soundClone = bounceSound.cloneNode();
-    soundClone.volume = 0.3;
-    soundClone.currentTime = 0;
-    soundClone.play().catch((err) => {
-      console.warn("Bounce sound failed to play — check that Sounds/bounce.wav exists, the filename/case matches exactly, and it loaded without a 404:", err);
-    });
+    playBounceSound();
   }
 });
+
 
 function getUpgrade(id){ return CONFIG.UPGRADES.find(u => u.id === id); }
 function getLevel(id){ return state.upgradeLevels[id] || 0; }
