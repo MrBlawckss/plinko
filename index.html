@@ -558,6 +558,30 @@ const CONFIG = {
       maxLevel: 10,
       effectText: (lvl) => `-${(lvl * 0.1).toFixed(1)}s drop cooldown`,
     },
+    {
+      id: "interest",
+      icon: "📈",
+      name: "Interest",
+      description: "Passively pays interest on your current balance every second. Starts at 0%, +1% per level.",
+      type: "interest",
+      ratePerLevel: 1,   // +1% per level
+      baseCost: 200,
+      growth: 1.6,
+      maxLevel: 50,      // caps at 50% of your balance, paid every second
+      effectText: (lvl) => `+${lvl}% of balance, every second`,
+    },
+    {
+      id: "goldenBall",
+      icon: "✨",
+      name: "Golden Ball",
+      description: "Each second, a chance to spawn a free golden ball that costs nothing to drop.",
+      type: "golden_ball",
+      chancePerLevel: 5, // +5% per level
+      baseCost: 300,
+      growth: 1.6,
+      maxLevel: 10,      // caps at 50% chance per second
+      effectText: (lvl) => `${lvl * 5}% chance per second for a free ball`,
+    },
   ],
 
   BALL_SKINS: [
@@ -737,6 +761,22 @@ function getCooldownTime(){
   const reduction = cdUpgrade ? cdLevel * cdUpgrade.reductionPerLevel : 0;
   return Math.max(0.1, Math.round((CONFIG.DROP_COOLDOWN_TIME - reduction) * 100) / 100);
 }
+function getInterestRate(){
+  // total % of current balance paid out every second, capped at 50%
+  let rate = 0;
+  CONFIG.UPGRADES.forEach(u => {
+    if(u.type === "interest") rate += getLevel(u.id) * u.ratePerLevel;
+  });
+  return Math.min(rate, 50);
+}
+function getGoldenBallChance(){
+  // % chance per second of spawning a free ball, capped at 50%
+  let chance = 0;
+  CONFIG.UPGRADES.forEach(u => {
+    if(u.type === "golden_ball") chance += getLevel(u.id) * u.chancePerLevel;
+  });
+  return Math.min(chance, 50);
+}
 function getRows(){ return CONFIG.BASE_PEG_ROWS; }
 function upgradeCost(u){
   const lvl = getLevel(u.id);
@@ -898,6 +938,40 @@ function triggerDrop() {
     });
   }
   updateHUD();
+}
+
+// Free ball spawned by the Golden Ball upgrade — always costs $0 to drop,
+// regardless of the equipped skin, so it's instantly recognizable as a bonus.
+function spawnGoldenBall(){
+  const spawnWidth = getSpawnWidthPx();
+  const startX = W / 2 + (Math.random() - 0.5) * spawnWidth;
+  const body = Bodies.circle(startX, TOP_MARGIN * 0.4, BALL_R, {
+    restitution: BALL_BOUNCINESS,
+    friction: 0.02,
+    frictionAir: BALL_FRICTION_AIR,
+    density: BALL_DENSITY,
+    label: "ball",
+  });
+  Body.setVelocity(body, { x: (Math.random() - 0.5) * 1.2, y: 0 });
+  Composite.add(engine.world, body);
+
+  balls.push({
+    body,
+    color: "#FFD700",
+    glow: true,
+    paid: false,
+    removeTimer: 45,
+    costPerBall: 0,
+  });
+
+  floaters.push({
+    x: startX,
+    y: TOP_MARGIN * 0.4,
+    text: "✨ FREE BALL!",
+    sub: "",
+    life: 45,
+    color: "#FFD700",
+  });
 }
 
 dropBtn.addEventListener("click", triggerDrop);
@@ -1149,6 +1223,24 @@ setInterval(() => {
     updateHUD();
   }
 }, 100);
+
+// Interest + Golden Ball tick — runs once per second, independent of
+// whether the player has dropped any balls yet.
+setInterval(() => {
+  const rate = getInterestRate();
+  if(rate > 0 && state.money > 0){
+    const gained = Math.round(state.money * (rate / 100) * 100) / 100;
+    if(gained > 0){
+      state.money = Math.round((state.money + gained) * 100) / 100;
+      updateHUD();
+    }
+  }
+
+  const goldenChance = getGoldenBallChance();
+  if(goldenChance > 0 && Math.random() * 100 < goldenChance){
+    spawnGoldenBall();
+  }
+}, 1000);
 
 function renderUpgrades(){
   const panel = document.getElementById("panel-upgrades");
