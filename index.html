@@ -276,6 +276,82 @@
   }
   #sidebar-backdrop.open{ opacity:1; pointer-events:auto; }
 
+  /* ---------- cheat password modal ---------- */
+  #cheat-modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6);
+    opacity:0; pointer-events:none; transition:opacity .2s; z-index:30;
+  }
+  #cheat-modal-backdrop.open{ opacity:1; pointer-events:auto; }
+  #cheat-modal{
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%, -48%);
+    width:min(320px, 88vw);
+    background:var(--bg-panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:22px;
+    z-index:31;
+    opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  }
+  #cheat-modal.open{ opacity:1; pointer-events:auto; transform:translate(-50%, -50%); }
+  #cheat-modal h3{ margin:0 0 6px; font-family:var(--font-display); font-size:16px; letter-spacing:1px; }
+  #cheat-modal p{ margin:0 0 14px; font-size:12.5px; color:var(--text-dim); }
+  #cheat-password-input{
+    width:100%; box-sizing:border-box;
+    background:var(--bg-panel-2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); padding:10px 12px; font-size:14px; font-family:var(--font-mono);
+  }
+  #cheat-password-input:focus{ outline:none; border-color:var(--cyan); }
+  #cheat-modal-error{ color:var(--bad); font-size:11.5px; min-height:16px; margin-top:8px; }
+  #cheat-modal-buttons{ display:flex; gap:10px; margin-top:6px; }
+  #cheat-modal-buttons button{
+    flex:1; font-family:var(--font-body); font-weight:700; font-size:12.5px;
+    padding:10px; border-radius:8px; border:none; cursor:pointer;
+  }
+  #cheat-cancel-btn{ background:var(--bg-panel-2); color:var(--text-dim); border:1px solid var(--line) !important; }
+  #cheat-submit-btn{ background:linear-gradient(180deg, var(--pink), #c11762); color:white; }
+
+  /* ---------- cheat panel (inside sidebar, once unlocked) ---------- */
+  .cheat-locked-msg{
+    text-align:center; color:var(--text-dim); font-size:13px;
+    padding:30px 10px; line-height:1.5;
+  }
+  .cheat-section-title{
+    font-family:var(--font-display); font-size:12px; letter-spacing:1px;
+    color:var(--cyan); margin:0 0 10px;
+  }
+  .cheat-money-row{ display:flex; gap:8px; margin-bottom:10px; }
+  .cheat-money-row input{
+    flex:1; min-width:0; box-sizing:border-box;
+    background:var(--bg-panel-2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); padding:9px 10px; font-size:13px; font-family:var(--font-mono);
+  }
+  .cheat-money-row input:focus{ outline:none; border-color:var(--cyan); }
+  .cheat-quick-buttons{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+  .cheat-quick-buttons button, .cheat-money-row button{
+    font-family:var(--font-body); font-weight:700; font-size:12px;
+    padding:9px 12px; border-radius:8px; border:none; cursor:pointer;
+    background:linear-gradient(180deg, var(--good), #2ec470); color:#081a14;
+  }
+  .cheat-upgrade-row{
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg-panel-2); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; margin-bottom:8px;
+  }
+  .cheat-upgrade-row .cheat-upgrade-name{ flex:1; font-size:12.5px; font-weight:600; }
+  .cheat-upgrade-row .cheat-upgrade-level{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+  }
+  .cheat-upgrade-row button{
+    font-family:var(--font-body); font-weight:700; font-size:11px;
+    padding:7px 10px; border-radius:7px; border:none; cursor:pointer;
+    background:var(--bg-deep); color:var(--cyan); border:1px solid var(--line) !important;
+    white-space:nowrap;
+  }
+  .cheat-upgrade-row button:hover{ border-color:var(--cyan) !important; }
+
   /* ============================================================
      MOBILE / SMALL SCREENS
      ============================================================ */
@@ -359,10 +435,24 @@
   <div id="tabs">
     <button class="tab-btn active" data-tab="upgrades">Upgrades</button>
     <button class="tab-btn" data-tab="skins">Ball Skins</button>
+    <button class="tab-btn" data-tab="cheats">🔒 Cheats</button>
   </div>
   <div id="sidebar-content">
     <div id="panel-upgrades" class="panel active"></div>
     <div id="panel-skins" class="panel"></div>
+    <div id="panel-cheats" class="panel"></div>
+  </div>
+</div>
+
+<div id="cheat-modal-backdrop"></div>
+<div id="cheat-modal">
+  <h3>🔒 Cheat Access</h3>
+  <p>Enter the password to unlock cheats.</p>
+  <input type="password" id="cheat-password-input" placeholder="Password" autocomplete="off">
+  <div id="cheat-modal-error"></div>
+  <div id="cheat-modal-buttons">
+    <button id="cheat-cancel-btn">Cancel</button>
+    <button id="cheat-submit-btn">Unlock</button>
   </div>
 </div>
 
@@ -1179,6 +1269,7 @@ document.getElementById("sidebar-toggle").addEventListener("click", () => {
   backdrop.classList.add("open");
   renderUpgrades();
   renderSkins();
+  renderCheats();
 });
 document.getElementById("sidebar-close").addEventListener("click", closeSidebar);
 backdrop.addEventListener("click", closeSidebar);
@@ -1187,12 +1278,164 @@ function closeSidebar(){
   backdrop.classList.remove("open");
 }
 
+/* ================================================================================
+   CHEAT MENU
+   ----------------------------------------------------------------------
+   Change this password to whatever you want — it's just a plain string
+   check, not real security (anyone could read it in the page source),
+   it's just meant to keep casual players from stumbling into it.
+   ================================================================================ */
+const CHEAT_PASSWORD = "plinko";
+
+let cheatUnlocked = false;
+
+const cheatModalBackdrop = document.getElementById("cheat-modal-backdrop");
+const cheatModal = document.getElementById("cheat-modal");
+const cheatPasswordInput = document.getElementById("cheat-password-input");
+const cheatModalError = document.getElementById("cheat-modal-error");
+const cheatsTabBtn = document.querySelector('.tab-btn[data-tab="cheats"]');
+
+function openCheatModal(){
+  cheatModalBackdrop.classList.add("open");
+  cheatModal.classList.add("open");
+  cheatModalError.textContent = "";
+  cheatPasswordInput.value = "";
+  cheatPasswordInput.focus();
+}
+function closeCheatModal(){
+  cheatModalBackdrop.classList.remove("open");
+  cheatModal.classList.remove("open");
+}
+
+function trySubmitCheatPassword(){
+  if(cheatPasswordInput.value === CHEAT_PASSWORD){
+    cheatUnlocked = true;
+    cheatsTabBtn.textContent = "🔓 Cheats";
+    closeCheatModal();
+    switchToTab("cheats");
+  } else {
+    cheatModalError.textContent = "Incorrect password.";
+    cheatPasswordInput.value = "";
+    cheatPasswordInput.focus();
+  }
+}
+
+document.getElementById("cheat-submit-btn").addEventListener("click", trySubmitCheatPassword);
+document.getElementById("cheat-cancel-btn").addEventListener("click", closeCheatModal);
+cheatModalBackdrop.addEventListener("click", closeCheatModal);
+cheatPasswordInput.addEventListener("keydown", (e) => {
+  if(e.key === "Enter") trySubmitCheatPassword();
+  if(e.key === "Escape") closeCheatModal();
+});
+
+function cheatAddMoney(amount){
+  if(!amount || amount <= 0) return;
+  state.money = Math.round((state.money + amount) * 100) / 100;
+  updateHUD();
+}
+
+function cheatMaxUpgrade(u){
+  state.upgradeLevels[u.id] = (u.maxLevel === Infinity) ? 999 : u.maxLevel;
+  updateHUD();
+  renderCheats();
+}
+
+function cheatAddUpgradeLevel(u){
+  const level = getLevel(u.id);
+  if(level < u.maxLevel) state.upgradeLevels[u.id] = level + 1;
+  updateHUD();
+  renderCheats();
+}
+
+function cheatMaxAllUpgrades(){
+  CONFIG.UPGRADES.forEach(u => {
+    state.upgradeLevels[u.id] = (u.maxLevel === Infinity) ? 999 : u.maxLevel;
+  });
+  updateHUD();
+  renderCheats();
+}
+
+function cheatUnlockAllSkins(){
+  CONFIG.BALL_SKINS.forEach(s => state.ownedSkins.add(s.id));
+  updateHUD();
+  renderCheats();
+}
+
+function renderCheats(){
+  const panel = document.getElementById("panel-cheats");
+
+  if(!cheatUnlocked){
+    panel.innerHTML = `<div class="cheat-locked-msg">🔒 Locked.<br>Click this tab to enter the password.</div>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="cheat-section-title">💵 MONEY</div>
+    <div class="cheat-money-row">
+      <input type="number" id="cheat-money-amount" placeholder="Amount" min="0" step="1">
+      <button id="cheat-add-money-btn">Add</button>
+    </div>
+    <div class="cheat-quick-buttons">
+      <button data-amount="1000">+$1,000</button>
+      <button data-amount="10000">+$10,000</button>
+      <button data-amount="100000">+$100,000</button>
+      <button data-amount="1000000">+$1,000,000</button>
+    </div>
+
+    <div class="cheat-section-title">⬆️ UPGRADES (FREE)</div>
+    <div style="margin-bottom:10px;">
+      <button id="cheat-max-all-btn" style="width:100%; font-family:var(--font-body); font-weight:700; font-size:12.5px; padding:10px; border-radius:8px; border:none; cursor:pointer; background:linear-gradient(180deg, var(--gold), #e8971f); color:#1a0e08;">MAX ALL UPGRADES</button>
+    </div>
+    <div id="cheat-upgrade-list"></div>
+
+    <div class="cheat-section-title" style="margin-top:16px;">🎨 SKINS</div>
+    <button id="cheat-unlock-skins-btn" style="width:100%; font-family:var(--font-body); font-weight:700; font-size:12.5px; padding:10px; border-radius:8px; border:none; cursor:pointer; background:linear-gradient(180deg, var(--pink), #c11762); color:white;">UNLOCK ALL SKINS</button>
+  `;
+
+  document.getElementById("cheat-add-money-btn").addEventListener("click", () => {
+    const input = document.getElementById("cheat-money-amount");
+    cheatAddMoney(parseFloat(input.value));
+    input.value = "";
+  });
+  panel.querySelectorAll(".cheat-quick-buttons button").forEach(btn => {
+    btn.addEventListener("click", () => cheatAddMoney(parseFloat(btn.dataset.amount)));
+  });
+  document.getElementById("cheat-max-all-btn").addEventListener("click", cheatMaxAllUpgrades);
+  document.getElementById("cheat-unlock-skins-btn").addEventListener("click", cheatUnlockAllSkins);
+
+  const list = document.getElementById("cheat-upgrade-list");
+  CONFIG.UPGRADES.forEach(u => {
+    const level = getLevel(u.id);
+    const maxLabel = u.maxLevel === Infinity ? "∞" : u.maxLevel;
+    const row = document.createElement("div");
+    row.className = "cheat-upgrade-row";
+    row.innerHTML = `
+      <span class="cheat-upgrade-name">${u.icon} ${u.name}</span>
+      <span class="cheat-upgrade-level">Lv ${level}/${maxLabel}</span>
+      <button data-action="add">+1</button>
+      <button data-action="max">MAX</button>
+    `;
+    row.querySelector('[data-action="add"]').addEventListener("click", () => cheatAddUpgradeLevel(u));
+    row.querySelector('[data-action="max"]').addEventListener("click", () => cheatMaxUpgrade(u));
+    list.appendChild(row);
+  });
+}
+
+function switchToTab(tabName){
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add("active");
+  document.getElementById("panel-" + tabName).classList.add("active");
+  if(tabName === "cheats") renderCheats();
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+    if(btn.dataset.tab === "cheats" && !cheatUnlocked){
+      openCheatModal();
+      return;
+    }
+    switchToTab(btn.dataset.tab);
   });
 });
 
