@@ -484,6 +484,10 @@ const CONFIG = {
   // Keeping this fixed means a cheaper ball costs less to drop but still
   // pays out the same, making discounts a genuine advantage.
   BIN_PAYOUT_BASE: 10,
+  // Multiplier bonus applied on top of whatever bin a GOLDEN ball lands in
+  // (see the Golden Ball upgrade). Multiplicative — a golden ball landing
+  // in a 2x bin pays out as 2x * 3 = 6x.
+  GOLDEN_BALL_MULTIPLIER: 3,
   BASE_PEG_ROWS: 14,        
   SPAWN_BASE_WIDTH_ROWS: 3,   
   SPAWN_MAX_WIDTH_ROWS: 10,   
@@ -574,13 +578,13 @@ const CONFIG = {
       id: "goldenBall",
       icon: "✨",
       name: "Golden Ball",
-      description: "Each second, a chance to spawn a free golden ball that costs nothing to drop.",
+      description: "Each ball you drop has a chance to be GOLDEN — landing in any bin still triggers a 3x multiplier bonus on top.",
       type: "golden_ball",
-      chancePerLevel: 5, // +5% per level
+      chancePerLevel: 1, // +1% per level
       baseCost: 300,
       growth: 1.6,
-      maxLevel: 10,      // caps at 50% chance per second
-      effectText: (lvl) => `${lvl * 5}% chance per second for a free ball`,
+      maxLevel: 50,      // caps at 50% chance per ball
+      effectText: (lvl) => `${lvl}% chance per ball to be GOLDEN (3x bonus)`,
     },
   ],
 
@@ -770,7 +774,7 @@ function getInterestRate(){
   return Math.min(rate, 50);
 }
 function getGoldenBallChance(){
-  // % chance per second of spawning a free ball, capped at 50%
+  // % chance, per ball dropped, of landing as GOLDEN (see GOLDEN_BALL_MULTIPLIER)
   let chance = 0;
   CONFIG.UPGRADES.forEach(u => {
     if(u.type === "golden_ball") chance += getLevel(u.id) * u.chancePerLevel;
@@ -916,6 +920,7 @@ function triggerDrop() {
 
   const skin = currentSkin();
   const spawnWidth = getSpawnWidthPx();
+  const goldenChance = getGoldenBallChance();
   for(let i = 0; i < count; i++){
     const startX = W / 2 + (Math.random() - 0.5) * spawnWidth + (i - (count - 1) / 2) * 4;
     const body = Bodies.circle(startX, TOP_MARGIN * 0.4, BALL_R, {
@@ -928,50 +933,19 @@ function triggerDrop() {
     Body.setVelocity(body, { x: (Math.random() - 0.5) * 1.2, y: 0 });
     Composite.add(engine.world, body);
 
+    const isGolden = goldenChance > 0 && Math.random() * 100 < goldenChance;
+
     balls.push({
       body,
-      color: skin.color,
-      glow: skin.glow,
+      color: isGolden ? "#FFD700" : skin.color,
+      glow: isGolden ? true : skin.glow,
       paid: false,
       removeTimer: 45,
-      costPerBall: cost
+      costPerBall: cost,
+      isGolden,
     });
   }
   updateHUD();
-}
-
-// Free ball spawned by the Golden Ball upgrade — always costs $0 to drop,
-// regardless of the equipped skin, so it's instantly recognizable as a bonus.
-function spawnGoldenBall(){
-  const spawnWidth = getSpawnWidthPx();
-  const startX = W / 2 + (Math.random() - 0.5) * spawnWidth;
-  const body = Bodies.circle(startX, TOP_MARGIN * 0.4, BALL_R, {
-    restitution: BALL_BOUNCINESS,
-    friction: 0.02,
-    frictionAir: BALL_FRICTION_AIR,
-    density: BALL_DENSITY,
-    label: "ball",
-  });
-  Body.setVelocity(body, { x: (Math.random() - 0.5) * 1.2, y: 0 });
-  Composite.add(engine.world, body);
-
-  balls.push({
-    body,
-    color: "#FFD700",
-    glow: true,
-    paid: false,
-    removeTimer: 45,
-    costPerBall: 0,
-  });
-
-  floaters.push({
-    x: startX,
-    y: TOP_MARGIN * 0.4,
-    text: "✨ FREE BALL!",
-    sub: "",
-    life: 45,
-    color: "#FFD700",
-  });
 }
 
 dropBtn.addEventListener("click", triggerDrop);
@@ -1040,12 +1014,15 @@ function settleBall(b){
   
   const ballCost = b.costPerBall;
   const bonus = bin.base > 1 ? getMultiplierBonus() : 0;
-  const finalMultiplier = bin.base * (1 + bonus);
+  let finalMultiplier = bin.base * (1 + bonus);
+  if(b.isGolden) finalMultiplier *= CONFIG.GOLDEN_BALL_MULTIPLIER;
   
   const returnAmount = Math.round(CONFIG.BIN_PAYOUT_BASE * finalMultiplier * 100) / 100;
   state.money = Math.round((state.money + returnAmount) * 100) / 100;
   const netChange = Math.round((returnAmount - ballCost) * 100) / 100;
-  const displaySub = `${finalMultiplier.toFixed(2)}x`;
+  const displaySub = b.isGolden
+    ? `✨ ${finalMultiplier.toFixed(2)}x (GOLDEN)`
+    : `${finalMultiplier.toFixed(2)}x`;
 
   updateHUD();
 
@@ -1054,7 +1031,7 @@ function settleBall(b){
 
   if (netChange > 0) {
     labelText = `+$${netChange.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    labelColor = "#57F29A";
+    labelColor = b.isGolden ? "#FFD700" : "#57F29A";
   } else if (netChange < 0) {
     labelText = `-$${Math.abs(netChange).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     labelColor = "#FF5C5C";
@@ -1224,8 +1201,9 @@ setInterval(() => {
   }
 }, 100);
 
-// Interest + Golden Ball tick — runs once per second, independent of
-// whether the player has dropped any balls yet.
+// Interest tick — runs once per second, independent of whether the player
+// has dropped any balls yet. (Golden Ball is handled per-drop in
+// triggerDrop() instead, not on a timer.)
 setInterval(() => {
   const rate = getInterestRate();
   if(rate > 0 && state.money > 0){
@@ -1234,11 +1212,6 @@ setInterval(() => {
       state.money = Math.round((state.money + gained) * 100) / 100;
       updateHUD();
     }
-  }
-
-  const goldenChance = getGoldenBallChance();
-  if(goldenChance > 0 && Math.random() * 100 < goldenChance){
-    spawnGoldenBall();
   }
 }, 1000);
 
