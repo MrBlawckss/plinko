@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Neon Plinko</title>
 <style>
   /* ============================================================
@@ -274,6 +275,46 @@
     opacity:0; pointer-events:none; transition:opacity .25s; z-index:15;
   }
   #sidebar-backdrop.open{ opacity:1; pointer-events:auto; }
+
+  /* ============================================================
+     MOBILE / SMALL SCREENS
+     ============================================================ */
+  @media (max-width: 700px){
+    #topbar{ padding:8px 10px; }
+    #logo{ font-size:14px; }
+    #logo span{ font-size:9px; letter-spacing:2px; }
+    #money-wrap{ padding:6px 10px; gap:6px; }
+    #money-label{ font-size:9px; }
+    #money{ font-size:15px; min-width:80px; }
+    #sidebar-toggle{ font-size:10px; padding:8px 10px; letter-spacing:0; }
+
+    #stage{ height:calc(100vh - 50px); padding:6px; }
+
+    /* controls move from a left-side floating panel to a compact bar
+       pinned along the bottom, so they never cover a narrow board */
+    #controls{
+      left:50%; top:auto; bottom:8px;
+      transform:translateX(-50%);
+      flex-direction:row; align-items:center;
+      padding:8px 10px; gap:8px;
+      width:calc(100% - 16px);
+      max-width:480px;
+    }
+    #drop-btn{ font-size:12px; padding:10px 12px; flex:1; }
+    #drop-cost{ font-size:10px; }
+    #autodrop-btn{ font-size:9px; padding:8px 10px; flex:0 0 auto; }
+    #autodrop-btn span:first-child{ display:none; } /* just show ON/OFF to save space */
+    #ball-count-badge{ font-size:10px; padding:8px 8px; flex:0 0 auto; white-space:nowrap; }
+
+    #add-cash-btn{ font-size:11px; padding:10px 14px; bottom:80px; }
+
+    #sidebar{ width:88vw; max-width:340px; }
+  }
+
+  @media (max-width: 420px){
+    #logo span{ display:none; } /* drop the tagline on very narrow phones */
+    #ball-count-badge{ display:none; } /* saves space; count still shown via drop-cost area */
+  }
 </style>
 </head>
 <body>
@@ -427,6 +468,7 @@ const CONFIG = {
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
 const stageEl = document.getElementById("stage");
+const controlsEl = document.getElementById("controls");
 
 let W, H;
 let TOP_MARGIN, BIN_HEIGHT, PLAY_H;
@@ -472,7 +514,7 @@ let addCashTimer = null;
 // filename, so just re-uploading a file with the same name isn't enough to
 // make people actually hear the new one. Changing this forces a fresh fetch.
 const SOUND_VERSION = 4;
-const bounceSound = new Audio(`Sounds/bouncehit.wav?v=${SOUND_VERSION}`);
+const bounceSound = new Audio(`Sounds/bounce.wav?v=${SOUND_VERSION}`);
 bounceSound.preload = 'auto';
 
 Matter.Events.on(engine, 'collisionStart', (event) => {
@@ -566,6 +608,12 @@ function buildBoard(){
 
   Composite.clear(engine.world, false);
   pegBodies = [];
+  // Composite.clear() above just wiped every physics body from the world,
+  // including any balls currently mid-air — without clearing these arrays
+  // too, their JS objects would keep rendering as frozen "ghost" circles
+  // forever, since their underlying physics body no longer exists.
+  balls = [];
+  floaters = [];
 
   const rowGapY = PLAY_H / (rows + 1);
   for(let i = 0; i < rows; i++){
@@ -609,7 +657,15 @@ function buildBoard(){
 }
 
 function resizeCanvas(){
-  const availH = stageEl.clientHeight - 16;
+  // On mobile (see the @media rule above) the controls panel becomes a
+  // horizontal bar pinned to the bottom of the screen instead of a
+  // floating overlay on the left — it's still position:absolute, so it
+  // doesn't reduce the stage's layout height automatically. We have to
+  // account for its height ourselves or the board would render underneath it.
+  const isMobileLayout = window.innerWidth <= 700;
+  const controlsSpace = isMobileLayout ? controlsEl.offsetHeight + 20 : 0;
+
+  const availH = stageEl.clientHeight - 16 - controlsSpace;
   const availW = stageEl.clientWidth - 16;
   let newW = CONFIG.BOARD_WIDTH;
   let newH = CONFIG.BOARD_HEIGHT;
@@ -635,6 +691,7 @@ function resizeCanvas(){
 }
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
+window.addEventListener("orientationchange", resizeCanvas);
 
 /* ================================================================================
    CONTROLS & BUTTONS
