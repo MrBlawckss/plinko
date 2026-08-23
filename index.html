@@ -336,14 +336,21 @@
     background:linear-gradient(180deg, var(--good), #2ec470); color:#081a14;
   }
   .cheat-upgrade-row{
-    display:flex; align-items:center; gap:8px;
     background:var(--bg-panel-2); border:1px solid var(--line); border-radius:10px;
     padding:10px 12px; margin-bottom:8px;
   }
+  .cheat-upgrade-top{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
   .cheat-upgrade-row .cheat-upgrade-name{ flex:1; font-size:12.5px; font-weight:600; }
   .cheat-upgrade-row .cheat-upgrade-level{
     font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
   }
+  .cheat-upgrade-bottom{ display:flex; gap:6px; }
+  .cheat-upgrade-amount{
+    flex:1; min-width:0; box-sizing:border-box;
+    background:var(--bg-deep); border:1px solid var(--line); border-radius:7px;
+    color:var(--text); padding:7px 8px; font-size:12px; font-family:var(--font-mono);
+  }
+  .cheat-upgrade-amount:focus{ outline:none; border-color:var(--cyan); }
   .cheat-upgrade-row button{
     font-family:var(--font-body); font-weight:700; font-size:11px;
     padding:7px 10px; border-radius:7px; border:none; cursor:pointer;
@@ -470,6 +477,13 @@ const CONFIG = {
   STARTING_MONEY: 5000,      
   BASE_BALL_COST: 10,       
   MIN_BALL_COST: 1,         
+  // Bin payouts are calculated from THIS fixed number, not from whatever
+  // you actually paid for the ball. If payouts scaled with ball cost, the
+  // Bargain Bin upgrade would be pointless — cheaper balls would just give
+  // proportionally smaller payouts too, so the profit ratio never changes.
+  // Keeping this fixed means a cheaper ball costs less to drop but still
+  // pays out the same, making discounts a genuine advantage.
+  BIN_PAYOUT_BASE: 10,
   BASE_PEG_ROWS: 14,        
   SPAWN_BASE_WIDTH_ROWS: 3,   
   SPAWN_MAX_WIDTH_ROWS: 10,   
@@ -954,7 +968,7 @@ function settleBall(b){
   const bonus = bin.base > 1 ? getMultiplierBonus() : 0;
   const finalMultiplier = bin.base * (1 + bonus);
   
-  const returnAmount = Math.round(ballCost * finalMultiplier * 100) / 100;
+  const returnAmount = Math.round(CONFIG.BIN_PAYOUT_BASE * finalMultiplier * 100) / 100;
   state.money = Math.round((state.money + returnAmount) * 100) / 100;
   const netChange = Math.round((returnAmount - ballCost) * 100) / 100;
   const displaySub = `${finalMultiplier.toFixed(2)}x`;
@@ -1340,9 +1354,12 @@ function cheatMaxUpgrade(u){
   renderCheats();
 }
 
-function cheatAddUpgradeLevel(u){
+function cheatAddUpgradeLevels(u, amount){
+  amount = Math.floor(amount);
+  if(!amount || amount <= 0) return;
   const level = getLevel(u.id);
-  if(level < u.maxLevel) state.upgradeLevels[u.id] = level + 1;
+  const cap = (u.maxLevel === Infinity) ? Infinity : u.maxLevel;
+  state.upgradeLevels[u.id] = Math.min(cap, level + amount);
   updateHUD();
   renderCheats();
 }
@@ -1410,12 +1427,23 @@ function renderCheats(){
     const row = document.createElement("div");
     row.className = "cheat-upgrade-row";
     row.innerHTML = `
-      <span class="cheat-upgrade-name">${u.icon} ${u.name}</span>
-      <span class="cheat-upgrade-level">Lv ${level}/${maxLabel}</span>
-      <button data-action="add">+1</button>
-      <button data-action="max">MAX</button>
+      <div class="cheat-upgrade-top">
+        <span class="cheat-upgrade-name">${u.icon} ${u.name}</span>
+        <span class="cheat-upgrade-level">Lv ${level}/${maxLabel}</span>
+      </div>
+      <div class="cheat-upgrade-bottom">
+        <input type="number" class="cheat-upgrade-amount" placeholder="Levels" min="1" step="1">
+        <button data-action="add">Add</button>
+        <button data-action="max">MAX</button>
+      </div>
     `;
-    row.querySelector('[data-action="add"]').addEventListener("click", () => cheatAddUpgradeLevel(u));
+    const amountInput = row.querySelector(".cheat-upgrade-amount");
+    row.querySelector('[data-action="add"]').addEventListener("click", () => {
+      cheatAddUpgradeLevels(u, parseInt(amountInput.value, 10));
+    });
+    amountInput.addEventListener("keydown", (e) => {
+      if(e.key === "Enter") cheatAddUpgradeLevels(u, parseInt(amountInput.value, 10));
+    });
     row.querySelector('[data-action="max"]').addEventListener("click", () => cheatMaxUpgrade(u));
     list.appendChild(row);
   });
